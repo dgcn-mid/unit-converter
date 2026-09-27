@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>단위 변환기</title>
+<style>
+  :root {
+    --bg: #f6f5f2;
+    --panel: #ffffff;
+    --ink: #1c1c1a;
+    --sub: #6b6a63;
+    --line: #dedcd4;
+    --accent: #2f5d50;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17181a;
+      --panel: #1f2123;
+      --ink: #ececea;
+      --sub: #9a9a95;
+      --line: #34363a;
+      --accent: #6fae9a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #17181a;
+    --panel: #1f2123;
+    --ink: #ececea;
+    --sub: #9a9a95;
+    --line: #34363a;
+    --accent: #6fae9a;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Söhne', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    min-height: 100%;
+    display: flex;
+    justify-content: center;
+    padding: 48px 20px 64px;
+  }
+  .card {
+    width: 100%;
+    max-width: 480px;
+  }
+  h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0 0 4px;
+  }
+  .lede {
+    color: var(--sub);
+    font-size: 0.9rem;
+    margin: 0 0 28px;
+  }
+  .tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 20px;
+  }
+  .tab {
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--sub);
+    padding: 7px 14px;
+    border-radius: 100px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: border-color .15s ease, color .15s ease, background .15s ease;
+  }
+  .tab.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 28px 24px;
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .field {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .field label {
+    font-size: 0.75rem;
+    color: var(--sub);
+  }
+  .field input, .field select {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 1.25rem;
+    background: transparent;
+    border: none;
+    border-bottom: 1.5px solid var(--line);
+    color: var(--ink);
+    padding: 6px 2px 10px;
+    outline: none;
+    width: 100%;
+  }
+  .field select {
+    font-family: inherit;
+    font-size: 0.95rem;
+    cursor: pointer;
+  }
+  .field input:focus, .field select:focus {
+    border-bottom-color: var(--accent);
+  }
+  .swap {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--sub);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    margin-top: 20px;
+    flex-shrink: 0;
+    transition: transform .2s ease, border-color .15s ease;
+  }
+  .swap:hover { border-color: var(--accent); color: var(--accent); }
+  .swap:active { transform: rotate(180deg); }
+  .divider {
+    height: 1px;
+    background: var(--line);
+    margin: 24px 0;
+  }
+  .result {
+    text-align: center;
+  }
+  .result .value {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 2.1rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .result .unit {
+    color: var(--sub);
+    font-size: 0.95rem;
+    margin-top: 2px;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>단위 변환기</h1>
+  <p class="lede">숫자를 입력하면 바로 변환됩니다.</p>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="panel">
+    <div class="row">
+      <div class="field">
+        <label>보낼 값</label>
+        <input id="fromValue" type="number" inputmode="decimal" value="1">
+        <select id="fromUnit"></select>
+      </div>
+      <button class="swap" id="swapBtn" aria-label="단위 교체" title="단위 교체">⇄</button>
+      <div class="field">
+        <label>단위</label>
+        <select id="toUnit" style="margin-top: 33px;"></select>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="result">
+      <div class="value" id="resultValue">—</div>
+      <div class="unit" id="resultUnit"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const categories = {
+  length: {
+    label: "길이",
+    base: "m",
+    units: {
+      m: { label: "미터 (m)", factor: 1 },
+      km: { label: "킬로미터 (km)", factor: 1000 },
+      cm: { label: "센티미터 (cm)", factor: 0.01 },
+      mm: { label: "밀리미터 (mm)", factor: 0.001 },
+      mi: { label: "마일 (mi)", factor: 1609.344 },
+      yd: { label: "야드 (yd)", factor: 0.9144 },
+      ft: { label: "피트 (ft)", factor: 0.3048 },
+      in: { label: "인치 (in)", factor: 0.0254 },
+    }
+  },
+  weight: {
+    label: "무게",
+    base: "kg",
+    units: {
+      kg: { label: "킬로그램 (kg)", factor: 1 },
+      g: { label: "그램 (g)", factor: 0.001 },
+      mg: { label: "밀리그램 (mg)", factor: 0.000001 },
+      lb: { label: "파운드 (lb)", factor: 0.45359237 },
+      oz: { label: "온스 (oz)", factor: 0.028349523125 },
+      ton: { label: "톤 (t)", factor: 1000 },
+    }
+  },
+  temperature: {
+    label: "온도",
+    base: "c",
+    units: {
+      c: { label: "섭씨 (°C)" },
+      f: { label: "화씨 (°F)" },
+      k: { label: "켈빈 (K)" },
+    }
+  },
+  volume: {
+    label: "부피",
+    base: "l",
+    units: {
+      l: { label: "리터 (L)", factor: 1 },
+      ml: { label: "밀리리터 (mL)", factor: 0.001 },
+      gal: { label: "갤런 (gal)", factor: 3.785411784 },
+      qt: { label: "쿼트 (qt)", factor: 0.946352946 },
+      cup: { label: "컵 (cup)", factor: 0.2365882365 },
+      floz: { label: "액량 온스 (fl oz)", factor: 0.0295735295625 },
+    }
+  },
+  area: {
+    label: "면적",
+    base: "sqm",
+    units: {
+      sqm: { label: "제곱미터 (m²)", factor: 1 },
+      sqkm: { label: "제곱킬로미터 (km²)", factor: 1000000 },
+      pyeong: { label: "평", factor: 3.305785 },
+      sqft: { label: "제곱피트 (ft²)", factor: 0.09290304 },
+      acre: { label: "에이커", factor: 4046.8564224 },
+    }
+  }
+};
+
+let currentCategory = "length";
+
+const tabsEl = document.getElementById("tabs");
+const fromValue = document.getElementById("fromValue");
+const fromUnit = document.getElementById("fromUnit");
+const toUnit = document.getElementById("toUnit");
+const resultValue = document.getElementById("resultValue");
+const resultUnit = document.getElementById("resultUnit");
+const swapBtn = document.getElementById("swapBtn");
+
+function buildTabs() {
+  tabsEl.innerHTML = "";
+  Object.keys(categories).forEach(key => {
+    const btn = document.createElement("button");
+    btn.className = "tab" + (key === currentCategory ? " active" : "");
+    btn.textContent = categories[key].label;
+    btn.onclick = () => { currentCategory = key; buildTabs(); buildUnits(); };
+    tabsEl.appendChild(btn);
+  });
+}
+
+function buildUnits() {
+  const cat = categories[currentCategory];
+  const keys = Object.keys(cat.units);
+  fromUnit.innerHTML = keys.map(k => `<option value="${k}">${cat.units[k].label}</option>`).join("");
+  toUnit.innerHTML = keys.map(k => `<option value="${k}">${cat.units[k].label}</option>`).join("");
+  fromUnit.value = keys[0];
+  toUnit.value = keys.length > 1 ? keys[1] : keys[0];
+  convert();
+}
+
+function toCelsius(val, unit) {
+  if (unit === "c") return val;
+  if (unit === "f") return (val - 32) * 5 / 9;
+  if (unit === "k") return val - 273.15;
+}
+function fromCelsius(val, unit) {
+  if (unit === "c") return val;
+  if (unit === "f") return val * 9 / 5 + 32;
+  if (unit === "k") return val + 273.15;
+}
+
+function convert() {
+  const cat = categories[currentCategory];
+  const val = parseFloat(fromValue.value);
+  const fu = fromUnit.value;
+  const tu = toUnit.value;
+
+  if (isNaN(val)) {
+    resultValue.textContent = "—";
+    resultUnit.textContent = "";
+    return;
+  }
+
+  let out;
+  if (currentCategory === "temperature") {
+    out = fromCelsius(toCelsius(val, fu), tu);
+  } else {
+    const baseVal = val * cat.units[fu].factor;
+    out = baseVal / cat.units[tu].factor;
+  }
+
+  const rounded = Math.abs(out) >= 1000 || Math.abs(out) < 0.0001 && out !== 0
+    ? out.toExponential(4)
+    : parseFloat(out.toFixed(6)).toString();
+
+  resultValue.textContent = rounded;
+  resultUnit.textContent = cat.units[tu].label;
+}
+
+swapBtn.addEventListener("click", () => {
+  const a = fromUnit.value, b = toUnit.value;
+  fromUnit.value = b;
+  toUnit.value = a;
+  convert();
+});
+
+fromValue.addEventListener("input", convert);
+fromUnit.addEventListener("change", convert);
+toUnit.addEventListener("change", convert);
+
+buildTabs();
+buildUnits();
+</script>
+</body>
+</html>
